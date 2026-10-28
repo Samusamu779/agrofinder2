@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Plataforma Comercial AgroFinder kAb</title>
+    <!-- Tailwind CSS y Leaflet Maps -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        #map {
+            height: 260px;
+            width: 100%;
+            border-radius: 0.75rem;
+            z-index: 10;
+        }
+        .pulse-normal {
+            animation: pulse-green 2s infinite;
+        }
+        .pulse-alert {
+            animation: pulse-red 0.8s infinite;
+        }
+        @keyframes pulse-green {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes pulse-red {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.9; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        input, select, button {
+            font-size: 16px !important;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between font-sans antialiased">
+
+    <!-- CABECERA SUPERIOR -->
+    <header class="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-50">
+        <div class="max-w-md mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <span class="text-2xl">🐾</span>
+                <div>
+                    <h1 class="font-bold text-lg text-sky-400 leading-none">AgroFinder kAb</h1>
+                    <span class="text-xs text-slate-400">Sistema de Monitoreo Ganadero</span>
+                </div>
+            </div>
+            <div id="user-badge" class="hidden text-xs bg-slate-800 border border-slate-700 text-sky-400 px-3 py-1 rounded-full font-semibold"></div>
+        </div>
+    </header>
+
+    <!-- CONTENEDOR PRINCIPAL -->
+    <main class="flex-grow p-4 flex items-center justify-center">
+        <div class="w-full max-w-md mx-auto">
+
+            <!-- 1. PANTALLA DE INICIO DE SESIÓN -->
+            <div id="view-login" class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 bg-sky-500/10 border border-sky-500/30 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                        <span class="text-3xl">📡</span>
+                    </div>
+                    <h2 class="text-xl font-bold text-white">Iniciar Sesión</h2>
+                    <p class="text-xs text-slate-400 mt-1">Ingrese sus credenciales de acceso al collar</p>
+                </div>
+
+                <form onsubmit="handleLogin(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">Usuario</label>
+                        <input type="text" id="input-user" required placeholder="admin1 o user1"
+                            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-sky-500 transition-colors">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">Contraseña</label>
+                        <input type="password" id="input-pass" required placeholder="••••••••"
+                            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-sky-500 transition-colors">
+                    </div>
+
+                    <div id="login-error" class="hidden text-red-400 text-xs bg-red-500/10 border border-red-500/20 p-3 rounded-xl text-center">
+                        Usuario o contraseña incorrectos.
+                    </div>
+
+                    <button type="submit"
+                        class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-sky-600/20 transition-all active:scale-[0.98]">
+                        Ingresar a la Plataforma
+                    </button>
+                </form>
+
+                <div class="mt-6 pt-4 border-t border-slate-800 text-center text-[11px] text-slate-500">
+                    AgroFinder kAb &copy; 2026 - Conectividad IoT Embebida
+                </div>
+            </div>
+
+            <!-- 2. PANORAMA DEL ADMINISTRADOR (admin1) -->
+            <div id="view-admin" class="hidden space-y-4">
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-bold text-sky-400">Panel de Control Admin</h2>
+                        <span class="text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2.5 py-1 rounded-md font-mono">ESP32 Conectado</span>
+                    </div>
+
+                    <p class="text-xs text-slate-400 mb-4">
+                        Seleccione el modo de operación para actualizar el estado del collar en tiempo real:
+                    </p>
+
+                    <!-- CONTROLES DE MODO (3 BOTONES) -->
+                    <div class="space-y-3">
+                        <button onclick="setOperatingMode('norm')" id="btn-mode-norm"
+                            class="w-full bg-slate-950 hover:bg-emerald-950/40 border border-slate-800 text-left p-4 rounded-xl flex items-center justify-between transition-all group">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold">1</div>
+                                <div>
+                                    <div class="font-bold text-sm text-white group-hover:text-emerald-400 transition-colors">Ritmo Cardíaco Normal</div>
+                                    <div class="text-xs text-slate-400">Rango continuo fisiológico (70 - 85 BPM)</div>
+                                </div>
+                            </div>
+                            <span id="badge-norm" class="hidden text-xs bg-emerald-500 text-slate-950 font-bold px-2 py-1 rounded">ACTIVO</span>
+                        </button>
+
+                        <button onclick="setOperatingMode('alt')" id="btn-mode-alt"
+                            class="w-full bg-slate-950 hover:bg-amber-950/40 border border-slate-800 text-left p-4 rounded-xl flex items-center justify-between transition-all group">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold">2</div>
+                                <div>
+                                    <div class="font-bold text-sm text-white group-hover:text-amber-400 transition-colors">Ritmo Cardíaco Acelerado</div>
+                                    <div class="text-xs text-slate-400">Alerta por esfuerzo/estrés (105 - 130 BPM)</div>
+                                </div>
+                            </div>
+                            <span id="badge-alt" class="hidden text-xs bg-amber-500 text-slate-950 font-bold px-2 py-1 rounded">ACTIVO</span>
+                        </button>
+
+                        <button onclick="setOperatingMode('off')" id="btn-mode-off"
+                            class="w-full bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left p-4 rounded-xl flex items-center justify-between transition-all group">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-lg bg-slate-700/20 border border-slate-700 flex items-center justify-center text-slate-400 font-bold">3</div>
+                                <div>
+                                    <div class="font-bold text-sm text-white group-hover:text-slate-300 transition-colors">Apagar / Ritmo en 0</div>
+                                    <div class="text-xs text-slate-400">Desactiva el sensor o simula sin contacto (0 BPM)</div>
+                                </div>
+                            </div>
+                            <span id="badge-off" class="hidden text-xs bg-slate-600 text-white font-bold px-2 py-1 rounded">ACTIVO</span>
+                        </button>
+                    </div>
+                </div>
+
+                <button onclick="logout()" class="w-full bg-red-600/10 hover:bg-red-600/20 border border-red-500/20 text-red-400 font-bold py-3 rounded-xl transition-colors text-sm">
+                    Cerrar Sesión de Administrador
+                </button>
+            </div>
+
+            <!-- 3. PANORAMA DEL USUARIO (User1) -->
+            <div id="view-user" class="hidden space-y-4">
+                <div id="card-bpm-container" class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl transition-colors">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Signos Vitales</span>
+                        <span id="heart-icon" class="text-xl">❤️</span>
+                    </div>
+
+                    <div class="flex items-baseline space-x-3 my-2">
+                        <span id="display-bpm" class="text-5xl font-black text-sky-400 tracking-tight">--</span>
+                        <span class="text-lg font-bold text-slate-400">BPM</span>
+                    </div>
+
+                    <div id="display-status-text" class="text-xs font-medium text-emerald-400 flex items-center space-x-1.5">
+                        <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                        <span>Medición activa en tiempo real</span>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Ubicación GPS del Collar</span>
+                        <span class="text-[10px] bg-sky-500/10 border border-sky-500/20 text-sky-400 px-2 py-0.5 rounded">Señal Alta</span>
+                    </div>
+
+                    <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                        <div class="text-xs font-semibold text-white">📍 Dirección de Referencia:</div>
+                        <div class="text-sm font-bold text-sky-400 mt-0.5">Cl. 90a #95d-56, Bogotá</div>
+                        <div class="text-[11px] text-slate-500 mt-1 font-mono">Lat: 4.7118 | Lon: -74.1130</div>
+                    </div>
+
+                    <div id="map" class="border border-slate-800"></div>
+                </div>
+
+                <button onclick="logout()" class="w-full bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 font-bold py-3 rounded-xl transition-colors text-sm">
+                    Cerrar Sesión
+                </button>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- PIE DE PÁGINA -->
+    <footer class="bg-slate-900 border-t border-slate-800 p-3 text-center text-[11px] text-slate-500">
+        Dispositivo AgroFinder kAb &bull; Monitoreo Remoto
+    </footer>
+
+    <!-- SCRIPT JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        let mapInstance = null;
+        let markerInstance = null;
+        const TARGET_LAT = 4.7118;
+        const TARGET_LNG = -74.1130;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (!localStorage.getItem('kab_mode')) {
+                localStorage.setItem('kab_mode', 'norm');
+            }
+            setInterval(updateHeartRateLoop, 2000);
+        });
+
+        function handleLogin(event) {
+            event.preventDefault();
+            const user = document.getElementById('input-user').value.trim().toLowerCase();
+            const pass = document.getElementById('input-pass').value.trim();
+            const errorEl = document.getElementById('login-error');
+
+            errorEl.classList.add('hidden');
+
+            if (user === 'admin1' && pass === '12345678') {
+                showView('admin');
+                document.getElementById('user-badge').innerText = 'Rol: Administrador';
+                document.getElementById('user-badge').classList.remove('hidden');
+                updateAdminViewUI();
+            } else if (user === 'user1' && pass === '1234') {
+                showView('user');
+                document.getElementById('user-badge').innerText = 'Rol: Usuario (Collar)';
+                document.getElementById('user-badge').classList.remove('hidden');
+                setTimeout(initLeafletMap, 200);
+            } else {
+                errorEl.classList.remove('hidden');
+            }
+        }
+
+        function showView(view) {
+            document.getElementById('view-login').classList.add('hidden');
+            document.getElementById('view-admin').classList.add('hidden');
+            document.getElementById('view-user').classList.add('hidden');
+
+            if (view === 'login') document.getElementById('view-login').classList.remove('hidden');
+            if (view === 'admin') document.getElementById('view-admin').classList.remove('hidden');
+            if (view === 'user') document.getElementById('view-user').classList.remove('hidden');
+        }
+
+        function logout() {
+            document.getElementById('input-user').value = '';
+            document.getElementById('input-pass').value = '';
+            document.getElementById('user-badge').classList.add('hidden');
+            showView('login');
+        }
+
+        function setOperatingMode(mode) {
+            localStorage.setItem('kab_mode', mode);
+            updateAdminViewUI();
+        }
+
+        function updateAdminViewUI() {
+            const currentMode = localStorage.getItem('kab_mode');
+            ['norm', 'alt', 'off'].forEach(m => {
+                const btn = document.getElementById(`btn-mode-${m}`);
+                const badge = document.getElementById(`badge-${m}`);
+                btn.classList.remove('border-emerald-500', 'border-amber-500', 'border-slate-500', 'bg-slate-900');
+                btn.classList.add('border-slate-800', 'bg-slate-950');
+                badge.classList.add('hidden');
+            });
+
+            const activeBtn = document.getElementById(`btn-mode-${currentMode}`);
+            const activeBadge = document.getElementById(`badge-${currentMode}`);
+
+            if (currentMode === 'norm') activeBtn.classList.add('border-emerald-500', 'bg-slate-900');
+            else if (currentMode === 'alt') activeBtn.classList.add('border-amber-500', 'bg-slate-900');
+            else if (currentMode === 'off') activeBtn.classList.add('border-slate-500', 'bg-slate-900');
+            
+            activeBadge.classList.remove('hidden');
+        }
+
+        function initLeafletMap() {
+            if (!mapInstance) {
+                mapInstance = L.map('map', {
+                    zoomControl: true,
+                    attributionControl: false
+                }).setView([TARGET_LAT, TARGET_LNG], 16);
+
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19
+                }).addTo(mapInstance);
+
+                markerInstance = L.marker([TARGET_LAT, TARGET_LNG]).addTo(mapInstance)
+                    .bindPopup('<b>AgroFinder kAb</b><br>Cl. 90a #95d-56, Bogotá')
+                    .openPopup();
+            } else {
+                mapInstance.invalidateSize();
+            }
+        }
+
+        function updateHeartRateLoop() {
+            const mode = localStorage.getItem('kab_mode') || 'norm';
+            const displayBpm = document.getElementById('display-bpm');
+            const statusText = document.getElementById('display-status-text');
+            const heartIcon = document.getElementById('heart-icon');
+
+            if (!displayBpm) return;
+
+            if (mode === 'norm') {
+                const bpm = Math.floor(Math.random() * (85 - 70 + 1)) + 70;
+                displayBpm.innerText = bpm;
+                displayBpm.className = 'text-5xl font-black text-emerald-400 tracking-tight';
+                statusText.innerHTML = '<span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span><span>Ritmo cardíaco normal</span>';
+                statusText.className = 'text-xs font-medium text-emerald-400 flex items-center space-x-1.5';
+                heartIcon.className = 'text-xl pulse-normal';
+            } 
+            else if (mode === 'alt') {
+                const bpm = Math.floor(Math.random() * (130 - 105 + 1)) + 105;
+                displayBpm.innerText = bpm;
+                displayBpm.className = 'text-5xl font-black text-amber-400 tracking-tight';
+                statusText.innerHTML = '<span class="inline-block w-2 h-2 rounded-full bg-amber-400 animate-ping"></span><span>Alerta: Elevar ritmo cardíaco</span>';
+                statusText.className = 'text-xs font-medium text-amber-400 flex items-center space-x-1.5';
+                heartIcon.className = 'text-xl pulse-alert';
+            } 
+            else if (mode === 'off') {
+                displayBpm.innerText = '0';
+                displayBpm.className = 'text-5xl font-black text-slate-600 tracking-tight';
+                statusText.innerHTML = '<span class="inline-block w-2 h-2 rounded-full bg-slate-600"></span><span>Dispositivo en reposo / Sin lectura</span>';
+                statusText.className = 'text-xs font-medium text-slate-500 flex items-center space-x-1.5';
+                heartIcon.className = 'text-xl opacity-30';
+            }
+        }
+    </script>
+</body>
+</html>
